@@ -55,7 +55,7 @@ How to use this buildsystem:
 
 .. note::
 
-  By default, the build system will download the python 3.6.7 source from
+  By default, the build system will download the python 3.8.5 source from
   http://www.python.org/ftp/python/
 
 
@@ -179,6 +179,11 @@ options on the commandline with `-DOPTION=VALUE`, or use the "ccmake" gui.
     If set to OFF, no attempt to detect Expat libraries will be done.
     Associated python extensions are: ELEMENTTREE, PYEXPAT
     Following CMake variables can manually be set: EXPAT_LIBRARIES, EXPAT_INCLUDE_DIRS
+
+  USE_SYSTEM_FFI=ON|OFF       (defaults to ON)
+    If set to OFF, no attempt to detect libffi libraries will be done.
+    Associated python extensions are: CTYPES
+    Following CMake variables can manually be set: FFI_LIBRARY, FFI_INCLUDE_DIR
 
   USE_SYSTEM_OpenSSL=ON|OFF     (defaults to ON)
     If set to OFF, no attempt to detect OpenSSL libraries will be done.

@@ -28,6 +28,58 @@ message(STATUS "The system name is ${CMAKE_SYSTEM_NAME}")
 message(STATUS "The system processor is ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "The system version is ${CMAKE_SYSTEM_VERSION}")
 
+function(find_dbg_lib)
+
+    set(prefix "fd")
+    set(options)
+    set(oneValueArgs "VAR_LIB" "DBG_POSTFIX" )
+    set(multiValueArgs "NAMES")
+
+    cmake_parse_arguments(
+        "${prefix}"
+        "${options}"
+        "${oneValueArgs}"
+        "${multiValueArgs}"
+        ${ARGN}
+        )
+
+    # compose the debug names
+    foreach(nm ${fd_NAMES})
+        list(APPEND DBG_NAMES "${nm}${fd_DBG_POSTFIX}")
+    endforeach()
+
+    find_library(DBG_LIBS NAMES ${DBG_NAMES})
+
+    set(blabby OFF)
+    if ( blabby )
+        message( STATUS "find_dbg_lib() received ${ARGV}" )
+        message( STATUS "finding variable \"${fd_VAR_LIB}\"" )
+        message( STATUS "${fd_VAR_LIB}=\"${${fd_VAR_LIB}}\"" )
+        message( STATUS "  debug postfix \"${fd_DBG_POSTFIX}\"" )
+        message( STATUS "  search names ${fd_NAMES}" )
+        asv_print_value(
+            CMAKE_FIND_LIBRARY_PREFIXES
+            CMAKE_FIND_LIBRARY_SUFFIXES
+            )
+        message( STATUS "  debug search names ${DBG_NAMES}" )
+        message( STATUS "  find_library returned ${DBG_LIBS}" )
+    endif ( blabby )
+
+    if ( DBG_LIBS )
+
+        set( val_VAR_LIB ${${fd_VAR_LIB}})
+        if ( val_VAR_LIB )
+            # optimized and debug - prepare optimized
+            set(${fd_VAR_LIB} "optimized" ${val_VAR_LIB} "debug" ${DBG_LIBS} PARENT_SCOPE)
+        else ( )
+            # just debug, no optimized
+            set(${fd_VAR_LIB} ${DBG_LIBS} PARENT_SCOPE)
+        endif ( )
+
+     endif ( DBG_LIBS )
+
+endfunction()
+
 # Find any dependencies
 if(USE_SYSTEM_BZip2)
     find_package(BZip2)
@@ -44,7 +96,54 @@ if(USE_SYSTEM_Curses)
 endif()
 
 if(USE_SYSTEM_EXPAT)
+    # https://github.com/Kitware/CMake/blob/master/Modules/FindEXPAT.cmake
     find_package(EXPAT)
+    find_dbg_lib(VAR_LIB EXPAT_LIBRARIES DBG_POSTFIX "_d" NAMES expat libexpat)
+    message(STATUS "EXPAT_FOUND=${EXPAT_FOUND}")
+    message(STATUS "EXPAT_INCLUDE_DIRS=${EXPAT_INCLUDE_DIRS}")
+    message(STATUS "EXPAT_LIBRARIES=${EXPAT_LIBRARIES}")
+endif()
+
+# get libffi
+# an "external" on windows...
+# build your own with cmake..
+# https://github.com/dand-oss/libffi
+if(USE_SYSTEM_FFI)
+    find_path(FFI_INCLUDE_DIRS ffi.h)
+    find_library(FFI_LIBRARIES NAMES ffi libffi)
+    # skip for FFI find_dbg_lib(VAR_LIB FFI_LIBRARIES DBG_POSTFIX "_d" NAMES ffi libffi)
+    message(STATUS "FFI_INCLUDE_DIRS=${FFI_INCLUDE_DIRS}")
+    message(STATUS "FFI_LIBRARIES=${FFI_LIBRARIES}")
+endif()
+
+if(USE_SYSTEM_GDBM)
+    find_path(GDBM_INCLUDE_PATH gdbm.h)
+    find_library(GDBM_LIBRARY gdbm)
+    find_library(GDBM_COMPAT_LIBRARY gdbm_compat)
+    find_path(NDBM_INCLUDE_PATH ndbm.h)
+    if(NDBM_INCLUDE_PATH)
+        set(NDBM_TAG NDBM)
+    else()
+        find_path(GDBM_NDBM_INCLUDE_PATH gdbm/ndbm.h)
+        if(GDBM_NDBM_INCLUDE_PATH)
+            set(NDBM_TAG GDBM_NDBM)
+        else()
+            find_path(GDBM_DASH_NDBM_INCLUDE_PATH gdbm-ndbm.h)
+            if(GDBM_DASH_NDBM_INCLUDE_PATH)
+                set(NDBM_TAG GDBM_DASH_NDBM)
+            endif()
+        endif()
+    endif()
+endif()
+
+if(USE_SYSTEM_READLINE)
+    if(USE_LIBEDIT)
+        find_path(READLINE_INCLUDE_PATH editline/readline.h)
+        find_library(READLINE_LIBRARY edit)
+    else()
+        find_path(READLINE_INCLUDE_PATH readline/readline.h)
+        find_library(READLINE_LIBRARY readline)
+    endif()
 endif()
 
 if(IS_PY3 AND USE_SYSTEM_LIBMPDEC)
@@ -53,7 +152,16 @@ if(IS_PY3 AND USE_SYSTEM_LIBMPDEC)
 endif()
 
 if(USE_SYSTEM_OpenSSL)
+    # https://github.com/Kitware/CMake/blob/master/Modules/FindOpenSSL.cmake
     find_package(OpenSSL 0.9.7)
+    message(STATUS "OPENSSL_FOUND=${OPENSSL_FOUND}")
+    message(STATUS "OPENSSL_INCLUDE_DIR=${OPENSSL_INCLUDE_DIR}")
+    message(STATUS "OPENSSL_CRYPTO_LIBRARY=${OPENSSL_CRYPTO_LIBRARY}")
+    message(STATUS "OPENSSL_CRYPTO_LIBRARIES=${OPENSSL_CRYPTO_LIBRARIES}")
+    message(STATUS "OPENSSL_SSL_LIBRARY=${OPENSSL_SSL_LIBRARY}")
+    message(STATUS "OPENSSL_SSL_LIBRARIES=${OPENSSL_SSL_LIBRARIES}")
+    message(STATUS "OPENSSL_LIBRARIES=${OPENSSL_LIBRARIES}")
+    message(STATUS "OPENSSL_VERSION=${OPENSSL_VERSION}")
 endif()
 
 if(USE_SYSTEM_TCL)
@@ -66,7 +174,12 @@ if(UNIX)
 endif()
 
 if(USE_SYSTEM_ZLIB)
+    # https://github.com/Kitware/CMake/blob/master/Modules/FindZLIB.cmake
     find_package(ZLIB)
+    # does not work with binascii find_dbg_lib(VAR_LIB ZLIB_LIBRARIES DBG_POSTFIX "_d" NAMES zlib libzlib)
+    message(STATUS "ZLIB_FOUND=${ZLIB_FOUND}")
+    message(STATUS "ZLIB_INCLUDE_DIRS=${ZLIB_INCLUDE_DIRS}")
+    message(STATUS "ZLIB_LIBRARIES=${ZLIB_LIBRARIES}")
 endif()
 
 if(USE_SYSTEM_DB)
@@ -107,16 +220,25 @@ if(USE_SYSTEM_READLINE)
     endif()
 endif()
 
-find_path(SQLITE3_INCLUDE_PATH sqlite3.h)
-find_library(SQLITE3_LIBRARY sqlite3)
+# https://github.com/Kitware/CMake/blob/master/Modules/FindSQLite3.cmake
+find_package(SQLite3 CONFIG)
+# fails link find_dbg_lib(VAR_LIB SQLite3_LIBRARIES DBG_POSTFIX "_d" NAMES sqlite3 libsqlite3)
+message(STATUS "SQLite3_FOUND=${SQLite3_FOUND}")
+message(STATUS "SQLite3_VERSION=${SQLite3_VERSION}")
+message(STATUS "SQLite3_INCLUDE_DIRS=${SQLite3_INCLUDE_DIRS}")
+message(STATUS "SQLite3_LIBRARIES=${SQLite3_LIBRARIES}")
 
+if(PY_VERSION VERSION_GREATER_EQUAL "3.7")
+    find_library(UUID_LIBRARY uuid)
+    message( STATUS "UUID_LIBRARY=${UUID_LIBRARY}")
+endif(PY_VERSION VERSION_GREATER_EQUAL "3.7")
 find_path(TIRPC_RPC_INCLUDE_PATH rpc.h PATHS "/usr/include/tirpc/rpc")
 find_library(TIRPC_LIBRARY tirpc)
 
 if(WIN32)
   set(M_LIBRARIES )
   set(HAVE_LIBM 1)
-  # From PC/pyconfig.h: 
+  # From PC/pyconfig.h:
   #  This is a manually maintained version used for the Watcom,
   #  Borland and Microsoft Visual C++ compilers.  It is a
   #  standard part of the Python distribution.
@@ -155,9 +277,11 @@ set(ABIFLAGS )
 if(Py_DEBUG)
   set(ABIFLAGS "${ABIFLAGS}d")
 endif()
-if(WITH_PYMALLOC)
-  set(ABIFLAGS "${ABIFLAGS}m")
-endif()
+# No longer using "m" abi flag on libpython3.8.so using WITH_PYMALLOC
+# https://github.com/python/cpython/pull/12931
+#if(WITH_PYMALLOC)
+#  set(ABIFLAGS "${ABIFLAGS}m")
+#endif()
 message(STATUS "${_msg} - ${ABIFLAGS}")
 
 set(_msg "Checking SOABI")
@@ -313,6 +437,10 @@ check_include_files(sys/syscall.h HAVE_SYS_SYSCALL_H)
 check_include_files(sys/sys_domain.h HAVE_SYS_SYS_DOMAIN_H)
 check_include_files(sys/uio.h HAVE_SYS_UIO_H)
 check_include_files(sys/xattr.h HAVE_SYS_XATTR_H)
+if(PY_VERSION VERSION_GREATER_EQUAL "3.7")
+    check_include_files(uuid/uuid.h HAVE_UUID_UUID_H)
+    check_include_files(uuid.h HAVE_UUID_H)
+endif(PY_VERSION VERSION_GREATER_EQUAL "3.7")
 
 # On Darwin (OS X) net/if.h requires sys/socket.h to be imported first.
 set(NET_IF_HEADERS stdio.h)
@@ -570,7 +698,7 @@ elseif(CMAKE_SYSTEM MATCHES "VxWorks\\-7$")
 
   # VxWorks-7
 
-  # On VxWorks-7, defining _XOPEN_SOURCE or _POSIX_C_SOURCE 
+  # On VxWorks-7, defining _XOPEN_SOURCE or _POSIX_C_SOURCE
   # leads to a failure in select.h because sys/types.h fails
   # to define FD_SETSIZE.
   # Reported by Martin Oberhuber as V7COR-4651.
@@ -656,10 +784,10 @@ endif()
 
 if(HAVE_LONG_LONG)
   if(SIZEOF_OFF_T GREATER SIZEOF_LONG
-      AND (SIZEOF_LONG_LONG GREATER SIZEOF_OFF_T OR SIZEOF_LONG_LONG EQUAL SIZEOF_OFF_T))      
+      AND (SIZEOF_LONG_LONG GREATER SIZEOF_OFF_T OR SIZEOF_LONG_LONG EQUAL SIZEOF_OFF_T))
       set(HAVE_LARGEFILE_SUPPORT 1)
   endif()
-  
+
 endif()
 
 
@@ -708,6 +836,10 @@ add_cond(CFG_HEADERS HAVE_SYS_ENDIAN_H sys/endian.h)
 add_cond(CFG_HEADERS HAVE_SYS_RESOURCE_H sys/resource.h)
 add_cond(CFG_HEADERS HAVE_SYS_SENDFILE_H sys/sendfile.h)
 add_cond(CFG_HEADERS HAVE_SYS_TIME_H sys/time.h)
+if(PY_VERSION VERSION_GREATER_EQUAL "3.7")
+    add_cond(CFG_HEADERS HAVE_UUID_UUID_H uuid/uuid.h)
+    add_cond(CFG_HEADERS HAVE_UUID_H uuid.h)
+endif(PY_VERSION VERSION_GREATER_EQUAL "3.7")
 endif()
 
 if(HAVE_PTY_H)
@@ -1293,7 +1425,7 @@ foreach(decl isinf isnan isfinite)
 endforeach()
 
 cmake_pop_check_state()
-  
+
 #######################################################################
 #
 # time
@@ -1427,7 +1559,7 @@ endif()
 
 #######################################################################
 #
-# unicode 
+# unicode
 #
 #######################################################################
 
@@ -1774,6 +1906,15 @@ if(HAVE_DLFCN_H)
   add_cond(CMAKE_REQUIRED_LIBRARIES HAVE_LIBDL "${HAVE_LIBDL}")
   check_symbol_exists(dlopen          "${CFG_HEADERS}" HAVE_DLOPEN)
 
+  check_symbol_exists(RTLD_DEEPBIND dlfcn.h HAVE_DECL_RTLD_DEEPBIND)
+  check_symbol_exists(RTLD_GLOBAL   dlfcn.h HAVE_DECL_RTLD_GLOBAL)
+  check_symbol_exists(RTLD_LAZY     dlfcn.h HAVE_DECL_RTLD_LAZY)
+  check_symbol_exists(RTLD_LOCAL    dlfcn.h HAVE_DECL_RTLD_LOCAL)
+  check_symbol_exists(RTLD_MEMBER   dlfcn.h HAVE_DECL_RTLD_MEMBER)
+  check_symbol_exists(RTLD_NODELETE dlfcn.h HAVE_DECL_RTLD_NODELETE)
+  check_symbol_exists(RTLD_NOLOAD   dlfcn.h HAVE_DECL_RTLD_NOLOAD)
+  check_symbol_exists(RTLD_NOW      dlfcn.h HAVE_DECL_RTLD_NOW)
+
   set(CFG_HEADERS ${CFG_HEADERS_SAVE})
   cmake_pop_check_state()
 endif()
@@ -1986,7 +2127,7 @@ endif()
 
 if(IS_PY2)
 check_c_source_compiles("
-        void f(char*,...)__attribute((format(PyArg_ParseTuple, 1, 2))) {}; 
+        void f(char*,...)__attribute((format(PyArg_ParseTuple, 1, 2))) {};
         int main() {f(NULL);} "
         HAVE_ATTRIBUTE_FORMAT_PARSETUPLE)
 endif()
@@ -2045,7 +2186,7 @@ cmake_pop_check_state()
 endif()
 
 check_c_source_runs("#include <unistd.h>\n int main() {
-        int val1 = nice(1); 
+        int val1 = nice(1);
         if (val1 != -1 && val1 == nice(2)) exit(0);
         exit(1);}" HAVE_BROKEN_NICE)
 
@@ -2055,7 +2196,7 @@ check_c_source_runs(" #include <poll.h>
     int poll_test = poll (&poll_struct, 1, 0);
     if (poll_test < 0) { exit(0); }
     else if (poll_test == 0 && poll_struct.revents != POLLNVAL) { exit(0); }
-    else { exit(1); } }" 
+    else { exit(1); } }"
     HAVE_BROKEN_POLL)
 
 
@@ -2419,13 +2560,13 @@ endif()
 
 ##########################################################
 
-if(ZLIB_LIBRARY)
+if(ZLIB_LIBRARIES)
   cmake_push_check_state()
   set(CFG_HEADERS_SAVE ${CFG_HEADERS})
 
   set(CFG_HEADERS ${CFG_HEADERS} zlib.h)
-  add_cond(CMAKE_REQUIRED_INCLUDES ZLIB_INCLUDE_DIR ${ZLIB_INCLUDE_DIR})
-  add_cond(CMAKE_REQUIRED_LIBRARIES ZLIB_LIBRARY ${ZLIB_LIBRARY})
+  add_cond(CMAKE_REQUIRED_INCLUDES ZLIB_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
+  add_cond(CMAKE_REQUIRED_LIBRARIES ZLIB_LIBRARIES ${ZLIB_LIBRARIES})
   check_symbol_exists(inflateCopy      "${CFG_HEADERS}" HAVE_ZLIB_COPY)
 
   set(CFG_HEADERS ${CFG_HEADERS_SAVE})
@@ -2453,7 +2594,7 @@ int main(int argc, char* argv[]){FSIORefNum fRef = 0; return 0;}")
     )
 endif()
 
-# todo 
+# todo
 set(PTHREAD_SYSTEM_SCHED_SUPPORTED 1)
 set(HAVE_DEVICE_MACROS ${HAVE_MAKEDEV})
 
